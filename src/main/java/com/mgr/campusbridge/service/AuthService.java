@@ -3,7 +3,9 @@ package com.mgr.campusbridge.service;
 import com.mgr.campusbridge.dto.request.LoginRequest;
 import com.mgr.campusbridge.dto.request.RegisterRequest;
 import com.mgr.campusbridge.dto.response.AuthResponse;
+import com.mgr.campusbridge.entity.MentorProfile;
 import com.mgr.campusbridge.entity.User;
+import com.mgr.campusbridge.repository.MentorProfileRepository;
 import com.mgr.campusbridge.repository.UserRepository;
 import com.mgr.campusbridge.security.JwtUtil;
 import lombok.RequiredArgsConstructor;
@@ -15,13 +17,16 @@ import org.springframework.stereotype.Service;
 public class AuthService {
 
     private final UserRepository userRepository;
+    private final MentorProfileRepository mentorProfileRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
 
     public AuthResponse register(RegisterRequest request) {
+
         if (userRepository.existsByEmail(request.getEmail())) {
             throw new RuntimeException("Email already registered");
         }
+
         User user = User.builder()
                 .name(request.getName())
                 .email(request.getEmail())
@@ -32,19 +37,61 @@ public class AuthService {
                 .verified(false)
                 .active(true)
                 .communityPoints(0)
+                .accountStatus(User.AccountStatus.PENDING)
                 .build();
-        userRepository.save(user);
-        String token = jwtUtil.generateToken(user.getEmail(), user.getRole().name());
-        return new AuthResponse(token, user.getName(), user.getEmail(), user.getRole().name());
+
+        User savedUser = userRepository.save(user);
+
+        // Auto-create mentor profile for mentors
+        if (savedUser.getRole() == User.Role.MENTOR) {
+
+            MentorProfile mentorProfile = MentorProfile.builder()
+                    .user(savedUser)
+                    .company("")
+                    .designation("")
+                    .rating(0.0)
+                    .reviewCount(0)
+                    .available(true)
+                    .build();
+
+            mentorProfileRepository.save(mentorProfile);
+        }
+
+        String token = jwtUtil.generateToken(
+                savedUser.getEmail(),
+                savedUser.getRole().name()
+        );
+
+        return new AuthResponse(
+                token,
+                savedUser.getName(),
+                savedUser.getEmail(),
+                savedUser.getRole().name()
+        );
     }
 
     public AuthResponse login(LoginRequest request) {
+
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new RuntimeException("Invalid credentials"));
-        if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
+
+        if (!passwordEncoder.matches(
+                request.getPassword(),
+                user.getPassword())) {
+
             throw new RuntimeException("Invalid credentials");
         }
-        String token = jwtUtil.generateToken(user.getEmail(), user.getRole().name());
-        return new AuthResponse(token, user.getName(), user.getEmail(), user.getRole().name());
+
+        String token = jwtUtil.generateToken(
+                user.getEmail(),
+                user.getRole().name()
+        );
+
+        return new AuthResponse(
+                token,
+                user.getName(),
+                user.getEmail(),
+                user.getRole().name()
+        );
     }
 }
