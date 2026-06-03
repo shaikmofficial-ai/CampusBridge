@@ -1,8 +1,11 @@
 package com.mgr.campusbridge.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
+
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 @Entity
@@ -23,6 +26,7 @@ public class User {
     @Column(nullable = false, unique = true)
     private String email;
 
+    @JsonIgnore
     @Column(nullable = false)
     private String password;
 
@@ -30,13 +34,23 @@ public class User {
     private Role role;
 
     private String department;
+
     private String batch;
-    private String bio;
+
     private String location;
+
+    @Column(columnDefinition = "TEXT")
+    private String bio;
+
     private String linkedinUrl;
+
     private String githubUrl;
-    private String profilePicture;
-    private int communityPoints;
+
+    private String portfolioUrl;
+
+    private String profilePictureUrl;
+
+    private int communityPoints = 0;
 
     @Column(nullable = false)
     private boolean verified = false;
@@ -44,24 +58,42 @@ public class User {
     @Column(nullable = false)
     private boolean active = true;
 
+    @Enumerated(EnumType.STRING)
+    private AccountStatus accountStatus = AccountStatus.PENDING;
+
     private LocalDateTime createdAt;
 
-    @ElementCollection
-    @CollectionTable(name = "user_skills", joinColumns = @JoinColumn(name = "user_id"))
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(
+            name = "user_skills",
+            joinColumns = @JoinColumn(name = "user_id")
+    )
     @Column(name = "skill")
-    private List<String> skills;
+    private List<String> skills = new ArrayList<>();
 
-    @ElementCollection
-    @CollectionTable(name = "user_achievements", joinColumns = @JoinColumn(name = "user_id"))
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(
+            name = "user_achievements",
+            joinColumns = @JoinColumn(name = "user_id")
+    )
     @Column(name = "achievement")
-    private List<String> achievements;
+    private List<String> achievements = new ArrayList<>();
 
     @PrePersist
     public void prePersist() {
         this.createdAt = LocalDateTime.now();
     }
 
+    public enum AccountStatus {
+        PENDING,
+        APPROVED,
+        REJECTED
+    }
+
     public enum Role {
-        STUDENT, ALUMNI, MENTOR, ADMIN
+        STUDENT,
+        ALUMNI,
+        MENTOR,
+        ADMIN
     }
 }

@@ -1,54 +1,124 @@
 package com.mgr.campusbridge.service;
 
-import com.mgr.campusbridge.entity.*;
-import com.mgr.campusbridge.repository.*;
+import com.mgr.campusbridge.dto.response.ResourceResponse;
+import com.mgr.campusbridge.entity.Resource;
+import com.mgr.campusbridge.entity.SavedResource;
+import com.mgr.campusbridge.entity.User;
+import com.mgr.campusbridge.exception.ResourceNotFoundException;
+import com.mgr.campusbridge.repository.ResourceRepository;
+import com.mgr.campusbridge.repository.SavedResourceRepository;
+import com.mgr.campusbridge.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.core.io.FileSystemResource;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
-import java.io.*;
+
+import java.io.IOException;
 import java.nio.file.*;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class ResourceService {
 
     private final ResourceRepository resourceRepository;
+    private final SavedResourceRepository savedResourceRepository;
     private final UserRepository userRepository;
+
     private static final String UPLOAD_DIR = "uploads/resources/";
 
-    public List<Resource> getAllResources() {
-        return resourceRepository.findAll();
+    public List<ResourceResponse> getAllResources(String userEmail) {
+        User user = findByEmail(userEmail);
+        return resourceRepository.findAllByOrderByUploadedAtDesc()
+                .stream()
+                .map(r -> ResourceResponse.from(r, savedResourceRepository.existsByUserAndResource(user, r)))
+                .collect(Collectors.toList());
     }
 
-    public List<Resource> getByType(String type) {
-        return resourceRepository.findByType(Resource.ResourceType.valueOf(type.toUpperCase()));
+    public List<ResourceResponse> getByType(String userEmail, String type) {
+        User user = findByEmail(userEmail);
+        Resource.ResourceType resourceType = Resource.ResourceType.valueOf(type.toUpperCase());
+        return resourceRepository.findByTypeOrderByUploadedAtDesc(resourceType)
+                .stream()
+                .map(r -> ResourceResponse.from(r, savedResourceRepository.existsByUserAndResource(user, r)))
+                .collect(Collectors.toList());
     }
 
-    public Resource uploadResource(String email, String title, String department,
-                                   String type, MultipartFile file) throws IOException {
-        User uploader = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
-        Files.createDirectories(Paths.get(UPLOAD_DIR));
-        String fileName = System.currentTimeMillis() + "_" + file.getOriginalFilename();
-        Path filePath = Paths.get(UPLOAD_DIR + fileName);
-        Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
+    @Transactional
+    public ResourceResponse uploadResource(String email, String title, String description,
+                                           String department, String type,
+                                           MultipartFile file) throws IOException {
+        User uploader = findByEmail(email);
+        String fileName = System.currentTimeMillis() + "_"
+                + StringUtils.cleanPath(file.getOriginalFilename());
+        Path uploadPath = Paths.get(UPLOAD_DIR);
+        Files.createDirectories(uploadPath);
+        Files.copy(file.getInputStream(), uploadPath.resolve(fileName),
+                StandardCopyOption.REPLACE_EXISTING);
 
         Resource resource = Resource.builder()
-                .uploader(uploader)
                 .title(title)
+                .description(description)
                 .department(department)
                 .type(Resource.ResourceType.valueOf(type.toUpperCase()))
-                .filePath(filePath.toString())
-                .fileSize(file.getSize() / 1024 + " KB")
+                .filePath(UPLOAD_DIR + fileName)
+                .fileSize(formatSize(file.getSize()))
+                .uploader(uploader)
+                .downloadCount(0)
                 .build();
-        return resourceRepository.save(resource);
+
+        return ResourceResponse.from(resourceRepository.save(resource), false);
     }
 
-    public Resource incrementDownload(Long resourceId) {
-        Resource resource = resourceRepository.findById(resourceId)
-                .orElseThrow(() -> new RuntimeException("Resource not found"));
+    public FileSystemResource downloadResource(Long resourceId) {
+        Resource resource = findResourceById(resourceId);
         resource.setDownloadCount(resource.getDownloadCount() + 1);
-        return resourceRepository.save(resource);
+        resourceRepository.save(resource);
+        return new FileSystemResource(resource.getFilePath());
+    }
+
+    @Transactional
+    public void saveResource(String email, Long resourceId) {
+        User user = findByEmail(email);
+        Resource resource = findResourceById(resourceId);
+        if (!savedResourceRepository.existsByUserAndResource(user, resource)) {
+            savedResourceRepository.save(SavedResource.builder()
+                    .user(user).resource(resource).build());
+        }
+    }
+
+    @Transactional
+    public void unsaveResource(String email, Long resourceId) {
+        User user = findByEmail(email);
+        Resource resource = findResourceById(resourceId);
+        savedResourceRepository.findByUserAndResource(user, resource)
+                .ifPresent(savedResourceRepository::delete);
+    }
+
+    public List<ResourceResponse> getSavedResources(String email) {
+        User user = findByEmail(email);
+        return savedResourceRepository.findSavedResourcesByUser(user)
+                .stream()
+                .map(r -> ResourceResponse.from(r, true))
+                .collect(Collectors.toList());
+    }
+
+    private String formatSize(long bytes) {
+        if (bytes < 1024) return bytes + " B";
+        if (bytes < 1024 * 1024) return (bytes / 1024) + " KB";
+        return (bytes / (1024 * 1024)) + " MB";
+    }
+
+    private Resource findResourceById(Long id) {
+        return resourceRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Resource not found: " + id));
+    }
+
+    private User findByEmail(String email) {
+        return userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + email));
     }
 }

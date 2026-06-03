@@ -16,20 +16,26 @@ public class PlacementStory {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne
-    @JoinColumn(name = "user_id")
-    private User user;
-
+    @Column(nullable = false)
     private String companyName;
 
-    @Column(columnDefinition = "TEXT")
+    private String studentName;
+    private String role;
+    private String packageAmount;
+
+    @Column(columnDefinition = "TEXT", nullable = false)
     private String story;
 
-    private String excerpt;
-    private LocalDateTime postedAt;
+    private String imageUrl;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "posted_by")
+    private User postedBy;
+
+    private LocalDateTime createdAt;
 
     @PrePersist
-    public void prePersist() {
-        this.postedAt = LocalDateTime.now();
+    public void onCreate() {
+        this.createdAt = LocalDateTime.now();
     }
 }

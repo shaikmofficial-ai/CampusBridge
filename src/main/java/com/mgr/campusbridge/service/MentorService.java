@@ -45,7 +45,7 @@ public class MentorService {
         r.setReviewCount(mp.getReviewCount());
         r.setSkills(mp.getSkills());
         r.setDomains(mp.getDomains());
-        r.setProfilePicture(mp.getUser().getProfilePicture());
+        r.setProfilePicture(mp.getUser().getProfilePictureUrl());
         return r;
     }
 }

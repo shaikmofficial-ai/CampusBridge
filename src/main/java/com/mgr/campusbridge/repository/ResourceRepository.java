@@ -6,4 +6,9 @@ import java.util.List;
 public interface ResourceRepository extends JpaRepository<Resource, Long> {
     List<Resource> findByType(Resource.ResourceType type);
     List<Resource> findByDepartment(String department);
+
+    // Add this to your existing ResourceRepository
+
+    List<Resource> findAllByOrderByUploadedAtDesc();
+    List<Resource> findByTypeOrderByUploadedAtDesc(Resource.ResourceType type);
 }

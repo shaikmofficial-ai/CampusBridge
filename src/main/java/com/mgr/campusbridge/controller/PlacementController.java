@@ -1,14 +1,16 @@
 package com.mgr.campusbridge.controller;
 
-import com.mgr.campusbridge.entity.PlacementDrive;
-import com.mgr.campusbridge.repository.UserRepository;
+import com.mgr.campusbridge.dto.request.PlacementDriveRequest;
+import com.mgr.campusbridge.dto.request.PlacementStoryRequest;
 import com.mgr.campusbridge.service.PlacementService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/placements")
@@ -17,33 +19,78 @@ import java.util.Map;
 public class PlacementController {
 
     private final PlacementService placementService;
-    private final UserRepository userRepository;
+
+    // --- DRIVES ---
 
     @GetMapping("/drives")
-    public ResponseEntity<?> getDrives() {
+    public ResponseEntity<?> getAllDrives() {
         return ResponseEntity.ok(placementService.getAllDrives());
     }
 
-    @GetMapping("/drives/active")
-    public ResponseEntity<?> getActiveDrives() {
-        return ResponseEntity.ok(placementService.getActiveDrives());
+    @GetMapping("/drives/open")
+    public ResponseEntity<?> getOpenDrives() {
+        return ResponseEntity.ok(placementService.getOpenDrives());
     }
 
-    @GetMapping("/stories")
-    public ResponseEntity<?> getStories() {
-        return ResponseEntity.ok(placementService.getStories());
+    @GetMapping("/drives/{id}")
+    public ResponseEntity<?> getDriveById(@PathVariable Long id) {
+        return ResponseEntity.ok(placementService.getDriveById(id));
     }
 
     @PostMapping("/drives")
-    public ResponseEntity<?> createDrive(@RequestBody PlacementDrive drive) {
-        return ResponseEntity.ok(placementService.createDrive(drive));
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> createDrive(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @Valid @RequestBody PlacementDriveRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(placementService.createDrive(userDetails.getUsername(), request));
+    }
+
+    @PutMapping("/drives/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> updateDrive(
+            @PathVariable Long id,
+            @Valid @RequestBody PlacementDriveRequest request) {
+        return ResponseEntity.ok(placementService.updateDrive(id, request));
+    }
+
+    @DeleteMapping("/drives/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> deleteDrive(@PathVariable Long id) {
+        placementService.deleteDrive(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    // --- STORIES ---
+
+    @GetMapping("/stories")
+    public ResponseEntity<?> getAllStories() {
+        return ResponseEntity.ok(placementService.getAllStories());
+    }
+
+    @GetMapping("/stories/{id}")
+    public ResponseEntity<?> getStoryById(@PathVariable Long id) {
+        return ResponseEntity.ok(placementService.getStoryById(id));
     }
 
     @PostMapping("/stories")
-    public ResponseEntity<?> createStory(@AuthenticationPrincipal UserDetails userDetails,
-                                         @RequestBody Map<String, String> body) {
-        return ResponseEntity.ok(placementService.createStory(
-                userDetails.getUsername(), body.get("company"),
-                body.get("story"), userRepository));
+    public ResponseEntity<?> createStory(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @Valid @RequestBody PlacementStoryRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(placementService.createStory(userDetails.getUsername(), request));
+    }
+
+    @PutMapping("/stories/{id}")
+    public ResponseEntity<?> updateStory(
+            @PathVariable Long id,
+            @Valid @RequestBody PlacementStoryRequest request) {
+        return ResponseEntity.ok(placementService.updateStory(id, request));
+    }
+
+    @DeleteMapping("/stories/{id}")
+    public ResponseEntity<?> deleteStory(@PathVariable Long id) {
+        placementService.deleteStory(id);
+        return ResponseEntity.noContent().build();
     }
 }

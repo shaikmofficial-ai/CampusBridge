@@ -7,4 +7,8 @@ public interface ForumPostRepository extends JpaRepository<ForumPost, Long> {
     List<ForumPost> findByIsPublicTrueOrderByCreatedAtDesc();
     List<ForumPost> findByGroupIdOrderByCreatedAtDesc(Long groupId);
     long countByAuthorId(Long userId);
+
+    // Add this to your existing ForumPostRepository
+
+
 }

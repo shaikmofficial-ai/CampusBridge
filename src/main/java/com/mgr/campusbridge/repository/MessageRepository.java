@@ -1,9 +1,10 @@
-// MessageRepository.java
 package com.mgr.campusbridge.repository;
+
 import com.mgr.campusbridge.entity.Message;
 import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
+
 public interface MessageRepository extends JpaRepository<Message, Long> {
     List<Message> findByConversationIdOrderBySentAtAsc(Long conversationId);
-    long countBySenderIdNotAndIsReadFalseAndConversationId(Long userId, Long conversationId);
+    long countByConversationIdAndIsReadFalseAndSenderIdNot(Long conversationId, Long senderId);
 }

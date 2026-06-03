@@ -16,26 +16,32 @@ public class Report {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne
-    @JoinColumn(name = "reporter_id")
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "reporter_id", nullable = false)
     private User reporter;
 
-    private String targetType;
-    private Long targetId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "reported_user_id")
+    private User reportedUser;
+
+    @Column(nullable = false)
     private String reason;
+
+    @Column(columnDefinition = "TEXT")
+    private String description;
 
     @Enumerated(EnumType.STRING)
     private ReportStatus status;
 
-    private LocalDateTime reportedAt;
+    private LocalDateTime createdAt;
 
     @PrePersist
-    public void prePersist() {
-        this.reportedAt = LocalDateTime.now();
+    public void onCreate() {
+        this.createdAt = LocalDateTime.now();
         this.status = ReportStatus.OPEN;
     }
 
     public enum ReportStatus {
-        OPEN, REVIEWED, DISMISSED
+        OPEN, RESOLVED, DISMISSED
     }
 }
