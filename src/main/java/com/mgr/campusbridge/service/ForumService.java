@@ -2,6 +2,7 @@ package com.mgr.campusbridge.service;
 
 import com.mgr.campusbridge.dto.request.ForumPostRequest;
 import com.mgr.campusbridge.entity.*;
+import com.mgr.campusbridge.exception.UnauthorizedException;
 import com.mgr.campusbridge.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -27,6 +28,7 @@ public class ForumService {
     public ForumPost createPost(String email, ForumPostRequest request) {
         User author = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found"));
+        requireApproved(author);
         ForumGroup group = null;
         if (request.getGroupId() != null) {
             group = groupRepository.findById(request.getGroupId()).orElse(null);
@@ -47,6 +49,7 @@ public class ForumService {
     public ForumComment addComment(String email, Long postId, String content) {
         User author = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found"));
+        requireApproved(author);
         ForumPost post = postRepository.findById(postId)
                 .orElseThrow(() -> new RuntimeException("Post not found"));
         post.setCommentCount(post.getCommentCount() + 1);
@@ -60,5 +63,14 @@ public class ForumService {
                 .orElseThrow(() -> new RuntimeException("Post not found"));
         post.setViews(post.getViews() + 1);
         return postRepository.save(post);
+    }
+
+    /** Block users whose account is not yet approved by an admin (admins bypass). */
+    private void requireApproved(User user) {
+        if (user.getRole() == User.Role.ADMIN) return;
+        if (user.getAccountStatus() != User.AccountStatus.APPROVED) {
+            throw new UnauthorizedException(
+                    "Your account is pending admin approval. You can post and comment once an admin approves you.");
+        }
     }
 }
