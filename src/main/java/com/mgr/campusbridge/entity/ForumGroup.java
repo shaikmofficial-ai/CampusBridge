@@ -1,5 +1,6 @@
 package com.mgr.campusbridge.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
 import java.util.List;
@@ -21,6 +22,7 @@ public class ForumGroup {
     private boolean isPrivate;
     private int memberCount;
 
+    @JsonIgnore
     @ManyToMany
     @JoinTable(name = "group_members",
             joinColumns = @JoinColumn(name = "group_id"),
