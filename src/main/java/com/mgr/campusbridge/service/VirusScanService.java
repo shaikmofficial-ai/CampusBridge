@@ -37,6 +37,14 @@ public class VirusScanService {
     @Value("${virustotal.enabled:false}")
     private boolean enabled;
 
+    /** How many times to poll for the verdict before giving up. */
+    @Value("${virustotal.poll-attempts:10}")
+    private int pollAttempts;
+
+    /** Delay between polls, in milliseconds. */
+    @Value("${virustotal.poll-interval-ms:3000}")
+    private long pollIntervalMs;
+
     private final RestClient restClient = RestClient.create();
 
     public enum Status { SKIPPED, QUEUED, CLEAN, MALICIOUS, ERROR }
@@ -47,8 +55,47 @@ public class VirusScanService {
         public static ScanResult error(String msg) { return new ScanResult(Status.ERROR, null, 0, msg); }
     }
 
+    public boolean isEnabled() {
+        return isConfigured();
+    }
+
     private boolean isConfigured() {
         return enabled && StringUtils.hasText(apiKey);
+    }
+
+    /**
+     * Submit a file and wait (polling) for the final verdict. This is the
+     * method to call when you want to BLOCK malicious uploads synchronously.
+     * Returns CLEAN / MALICIOUS once analysis completes, or QUEUED if the
+     * verdict isn't ready within the poll budget (caller decides what to do).
+     */
+    public ScanResult scanAndWait(byte[] content, String filename) {
+        ScanResult submitted = submit(content, filename);
+        if (submitted.status() != Status.QUEUED || submitted.analysisId() == null) {
+            return submitted; // SKIPPED / ERROR
+        }
+
+        String analysisId = submitted.analysisId();
+        for (int attempt = 0; attempt < pollAttempts; attempt++) {
+            try {
+                Thread.sleep(pollIntervalMs);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return ScanResult.error("Scan interrupted");
+            }
+            ScanResult report = getReport(analysisId);
+            if (report.status() == Status.CLEAN
+                    || report.status() == Status.MALICIOUS
+                    || report.status() == Status.ERROR
+                    || report.status() == Status.SKIPPED) {
+                return report;
+            }
+            // else QUEUED -> keep polling
+            log.debug("VirusTotal still analysing '{}' (attempt {}/{})", filename, attempt + 1, pollAttempts);
+        }
+        log.warn("VirusTotal verdict not ready for '{}' after {} attempts; treating as inconclusive.",
+                filename, pollAttempts);
+        return ScanResult.queued(analysisId);
     }
 
     /** Upload bytes to VirusTotal and return an analysis id (or a SKIPPED/ERROR result). */

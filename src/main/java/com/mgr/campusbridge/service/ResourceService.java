@@ -61,19 +61,22 @@ public class ResourceService {
         // 1) Block fake extensions / disallowed types by inspecting real content.
         fileValidationService.validate(file);
 
-        // 2) Best-effort malware scan (async on the provider side; non-blocking here).
+        // 2) Malware scan (VirusTotal). When enabled, we wait for the verdict
+        //    and block the upload if any engine flags the file.
         try {
-            VirusScanService.ScanResult scan = virusScanService.submit(file.getBytes(), file.getOriginalFilename());
+            VirusScanService.ScanResult scan = virusScanService.scanAndWait(
+                    file.getBytes(), file.getOriginalFilename());
             if (scan.status() == VirusScanService.Status.MALICIOUS) {
                 throw new com.mgr.campusbridge.exception.UnauthorizedException(
-                        "This file was flagged as malicious and cannot be uploaded.");
+                        "This file was flagged as malicious (" + scan.malicious()
+                                + " engines) and cannot be uploaded.");
             }
-            log.info("VirusTotal scan for '{}': status={} analysisId={}",
-                    file.getOriginalFilename(), scan.status(), scan.analysisId());
+            log.info("VirusTotal scan for '{}': status={} malicious={} analysisId={}",
+                    file.getOriginalFilename(), scan.status(), scan.malicious(), scan.analysisId());
         } catch (com.mgr.campusbridge.exception.UnauthorizedException e) {
             throw e;
         } catch (Exception e) {
-            log.warn("Virus scan submission skipped due to error: {}", e.getMessage());
+            log.warn("Virus scan skipped due to error: {}", e.getMessage());
         }
 
         String fileName = System.currentTimeMillis() + "_"
