@@ -12,6 +12,7 @@ public class ProfileResponse {
     private String name;
     private String email;
     private String role;
+    private String registerNumber;
     private String department;
     private String batch;
     private String bio;
@@ -30,6 +31,7 @@ public class ProfileResponse {
                 .name(user.getName())
                 .email(user.getEmail())
                 .role(user.getRole().name())
+                .registerNumber(user.getRegisterNumber())
                 .department(user.getDepartment())
                 .batch(user.getBatch())
                 .bio(user.getBio())

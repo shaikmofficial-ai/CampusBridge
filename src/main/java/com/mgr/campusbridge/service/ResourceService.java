@@ -27,6 +27,11 @@ public class ResourceService {
     private final ResourceRepository resourceRepository;
     private final SavedResourceRepository savedResourceRepository;
     private final UserRepository userRepository;
+    private final FileValidationService fileValidationService;
+    private final VirusScanService virusScanService;
+
+    private static final org.slf4j.Logger log =
+            org.slf4j.LoggerFactory.getLogger(ResourceService.class);
 
     private static final String UPLOAD_DIR = "uploads/resources/";
 
@@ -52,6 +57,25 @@ public class ResourceService {
                                            String department, String type,
                                            MultipartFile file) throws IOException {
         User uploader = findByEmail(email);
+
+        // 1) Block fake extensions / disallowed types by inspecting real content.
+        fileValidationService.validate(file);
+
+        // 2) Best-effort malware scan (async on the provider side; non-blocking here).
+        try {
+            VirusScanService.ScanResult scan = virusScanService.submit(file.getBytes(), file.getOriginalFilename());
+            if (scan.status() == VirusScanService.Status.MALICIOUS) {
+                throw new com.mgr.campusbridge.exception.UnauthorizedException(
+                        "This file was flagged as malicious and cannot be uploaded.");
+            }
+            log.info("VirusTotal scan for '{}': status={} analysisId={}",
+                    file.getOriginalFilename(), scan.status(), scan.analysisId());
+        } catch (com.mgr.campusbridge.exception.UnauthorizedException e) {
+            throw e;
+        } catch (Exception e) {
+            log.warn("Virus scan submission skipped due to error: {}", e.getMessage());
+        }
+
         String fileName = System.currentTimeMillis() + "_"
                 + StringUtils.cleanPath(file.getOriginalFilename());
         Path uploadPath = Paths.get(UPLOAD_DIR);

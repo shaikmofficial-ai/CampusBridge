@@ -33,6 +33,10 @@ public class User {
     @Enumerated(EnumType.STRING)
     private Role role;
 
+    /** University register/roll number. Unique when present. */
+    @Column(unique = true)
+    private String registerNumber;
+
     private String department;
 
     private String batch;

@@ -26,12 +26,18 @@ public class AuthService {
         if (userRepository.existsByEmail(request.getEmail())) {
             throw new RuntimeException("Email already registered");
         }
+        if (request.getRegisterNumber() != null && !request.getRegisterNumber().isBlank()
+                && userRepository.existsByRegisterNumber(request.getRegisterNumber().trim())) {
+            throw new RuntimeException("Register number already registered");
+        }
 
         User user = User.builder()
                 .name(request.getName())
                 .email(request.getEmail())
                 .password(passwordEncoder.encode(request.getPassword()))
                 .role(User.Role.valueOf(request.getRole().toUpperCase()))
+                .registerNumber(request.getRegisterNumber() != null && !request.getRegisterNumber().isBlank()
+                        ? request.getRegisterNumber().trim() : null)
                 .department(request.getDepartment())
                 .batch(request.getBatch())
                 .verified(false)
@@ -66,13 +72,19 @@ public class AuthService {
                 token,
                 savedUser.getName(),
                 savedUser.getEmail(),
-                savedUser.getRole().name()
+                savedUser.getRole().name(),
+                savedUser.getRegisterNumber()
         );
     }
 
     public AuthResponse login(LoginRequest request) {
 
-        User user = userRepository.findByEmail(request.getEmail())
+        String id = (request.getIdentifier() != null && !request.getIdentifier().isBlank())
+                ? request.getIdentifier().trim()
+                : request.getEmail();
+
+        User user = userRepository.findByEmail(id)
+                .or(() -> userRepository.findByRegisterNumber(id))
                 .orElseThrow(() -> new RuntimeException("Invalid credentials"));
 
         if (!passwordEncoder.matches(
@@ -91,7 +103,8 @@ public class AuthService {
                 token,
                 user.getName(),
                 user.getEmail(),
-                user.getRole().name()
+                user.getRole().name(),
+                user.getRegisterNumber()
         );
     }
 }
