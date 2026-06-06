@@ -2,6 +2,7 @@ package com.mgr.campusbridge.controller;
 
 import com.mgr.campusbridge.dto.request.PlacementDriveRequest;
 import com.mgr.campusbridge.dto.request.PlacementStoryRequest;
+import com.mgr.campusbridge.service.JobFetchService;
 import com.mgr.campusbridge.service.PlacementService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -12,6 +13,8 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Map;
+
 @RestController
 @RequestMapping("/api/placements")
 @RequiredArgsConstructor
@@ -19,6 +22,7 @@ import org.springframework.web.bind.annotation.*;
 public class PlacementController {
 
     private final PlacementService placementService;
+    private final JobFetchService jobFetchService;
 
     // --- DRIVES ---
 
@@ -92,5 +96,23 @@ public class PlacementController {
     public ResponseEntity<?> deleteStory(@PathVariable Long id) {
         placementService.deleteStory(id);
         return ResponseEntity.noContent().build();
+    }
+
+    // --- EXTERNAL JOBS (auto-fetched from Adzuna) ---
+
+    /** Live job openings pulled from the external provider, cached locally. */
+    @GetMapping("/jobs")
+    public ResponseEntity<?> getExternalJobs(
+            @RequestParam(required = false) String query,
+            @RequestParam(required = false) String location) {
+        return ResponseEntity.ok(jobFetchService.getJobs(query, location));
+    }
+
+    /** Manually trigger a refresh from the provider (admin only). */
+    @PostMapping("/jobs/refresh")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> refreshExternalJobs() {
+        int count = jobFetchService.refreshAll();
+        return ResponseEntity.ok(Map.of("refreshed", count));
     }
 }
