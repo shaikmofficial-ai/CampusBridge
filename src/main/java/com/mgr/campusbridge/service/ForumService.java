@@ -1,11 +1,14 @@
 package com.mgr.campusbridge.service;
 
+import com.mgr.campusbridge.dto.request.ForumGroupRequest;
 import com.mgr.campusbridge.dto.request.ForumPostRequest;
+import com.mgr.campusbridge.dto.response.ForumCommentResponse;
 import com.mgr.campusbridge.entity.*;
 import com.mgr.campusbridge.exception.UnauthorizedException;
 import com.mgr.campusbridge.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -56,6 +59,35 @@ public class ForumService {
         postRepository.save(post);
         return commentRepository.save(ForumComment.builder()
                 .post(post).author(author).content(content).build());
+    }
+
+    /** List comments on a post (oldest first). */
+    public List<ForumCommentResponse> getComments(Long postId) {
+        return commentRepository.findByPostIdOrderByCreatedAtAsc(postId)
+                .stream().map(ForumCommentResponse::from).toList();
+    }
+
+    /** Create a forum group ("private forum"). The creator becomes the first member. */
+    public ForumGroup createGroup(String email, ForumGroupRequest request) {
+        User creator = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        requireApproved(creator);
+        if (request.getName() == null || request.getName().isBlank()) {
+            throw new RuntimeException("Group name is required");
+        }
+        ForumGroup group = ForumGroup.builder()
+                .name(request.getName().trim())
+                .description(request.getDescription())
+                .isPrivate(request.getIsPrivate() == null || request.getIsPrivate())
+                .members(new ArrayList<>(List.of(creator)))
+                .memberCount(1)
+                .build();
+        return groupRepository.save(group);
+    }
+
+    /** Posts belonging to a group (newest first). */
+    public List<ForumPost> getGroupPosts(Long groupId) {
+        return postRepository.findByGroupIdOrderByCreatedAtDesc(groupId);
     }
 
     public ForumPost viewPost(Long postId) {
