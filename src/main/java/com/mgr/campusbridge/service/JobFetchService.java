@@ -8,10 +8,6 @@ import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.context.event.ApplicationReadyEvent;
-import org.springframework.context.event.EventListener;
-import org.springframework.scheduling.annotation.Async;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -20,7 +16,10 @@ import org.springframework.web.util.UriComponentsBuilder;
 
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -83,6 +82,78 @@ public class JobFetchService {
         return saved;
     }
 
+    /**
+     * Clear all cached (non-alumni) Adzuna records and bulk-insert fresh
+     * listings. Alumni/mentor-posted jobs live in a separate table and are
+     * untouched. Used by the scheduled {@link JobAutomationService}.
+     */
+    @Transactional
+    public int refreshAllReplacing() {
+        if (!isConfigured()) {
+            log.warn("Adzuna API not configured (set adzuna.app-id / adzuna.app-key). Skipping job refresh.");
+            return 0;
+        }
+        Map<String, ExternalJob> fresh = new LinkedHashMap<>();
+        for (String q : defaultQueries) {
+            try {
+                for (ExternalJob job : fetchListForQuery(q.trim())) {
+                    fresh.putIfAbsent(job.getExternalId(), job); // de-dup across queries
+                }
+            } catch (Exception e) {
+                log.error("Failed to fetch Adzuna jobs for query '{}': {}", q, e.getMessage());
+            }
+        }
+        if (fresh.isEmpty()) {
+            log.warn("Adzuna returned no listings; keeping existing cache to avoid wiping the board.");
+            return 0;
+        }
+        repository.deleteAllInBatch();                 // clear old non-alumni records
+        repository.saveAll(fresh.values());            // bulk-save fresh listings
+        log.info("Adzuna automation: replaced cache with {} fresh jobs.", fresh.size());
+        return fresh.size();
+    }
+
+    /** Fetch (without saving) the mapped entities for a single query. */
+    private List<ExternalJob> fetchListForQuery(String query) {
+        String url = UriComponentsBuilder
+                .fromUriString(ADZUNA_BASE + "/" + country + "/search/1")
+                .queryParam("app_id", appId)
+                .queryParam("app_key", appKey)
+                .queryParam("results_per_page", resultsPerPage)
+                .queryParam("what", query)
+                .queryParam("content-type", "application/json")
+                .build()
+                .toUriString();
+
+        AdzunaSearchResponse response = restClient.get().uri(url).retrieve().body(AdzunaSearchResponse.class);
+        if (response == null || response.getResults() == null) return List.of();
+
+        List<ExternalJob> out = new ArrayList<>();
+        for (AdzunaSearchResponse.AdzunaJob job : response.getResults()) {
+            if (job.getId() == null) continue;
+            out.add(toEntity(job));
+        }
+        return out;
+    }
+
+    private ExternalJob toEntity(AdzunaSearchResponse.AdzunaJob job) {
+        ExternalJob entity = new ExternalJob();
+        entity.setExternalId(job.getId());
+        entity.setTitle(job.getTitle());
+        entity.setCompany(job.getCompany() != null ? job.getCompany().getDisplayName() : null);
+        entity.setLocation(job.getLocation() != null ? job.getLocation().getDisplayName() : null);
+        entity.setCategory(job.getCategory() != null ? job.getCategory().getLabel() : null);
+        entity.setSalaryMin(job.getSalaryMin());
+        entity.setSalaryMax(job.getSalaryMax());
+        entity.setContractTime(job.getContractTime());
+        entity.setRedirectUrl(job.getRedirectUrl());
+        entity.setDescription(job.getDescription());
+        entity.setSource("Adzuna");
+        entity.setPostedAt(parseDate(job.getCreated()));
+        entity.setFetchedAt(LocalDateTime.now());
+        return entity;
+    }
+
     @Transactional
     protected int fetchForQuery(String query) {
         String url = UriComponentsBuilder
@@ -143,23 +214,5 @@ public class JobFetchService {
 
     private String emptyToNull(String s) {
         return StringUtils.hasText(s) ? s : null;
-    }
-
-    // --- Scheduling ---
-
-    /** Initial fetch shortly after startup (only if nothing cached yet). */
-    @EventListener(ApplicationReadyEvent.class)
-    @Async
-    public void onStartup() {
-        if (isConfigured() && repository.count() == 0) {
-            log.info("No cached jobs found — performing initial Adzuna fetch.");
-            refreshAll();
-        }
-    }
-
-    /** Refresh twice a day (06:00 and 18:00 server time). Configurable. */
-    @Scheduled(cron = "${adzuna.refresh-cron:0 0 6,18 * * *}")
-    public void scheduledRefresh() {
-        refreshAll();
     }
 }
