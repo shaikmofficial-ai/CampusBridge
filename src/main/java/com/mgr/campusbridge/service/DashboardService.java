@@ -28,8 +28,13 @@ public class DashboardService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-        long mentorsConnected = connectionRepository.countByStudentAndStatus(
-                user, MentorConnection.Status.ACCEPTED);
+        boolean isMentorRole = user.getRole() == User.Role.MENTOR || user.getRole() == User.Role.ALUMNI;
+
+        // For mentors/alumni this counts mentees connected to them; for
+        // students it counts the mentors they're connected with.
+        long mentorsConnected = isMentorRole
+                ? connectionRepository.countByMentorAndStatus(user, MentorConnection.Status.ACCEPTED)
+                : connectionRepository.countByStudentAndStatus(user, MentorConnection.Status.ACCEPTED);
         long resourcesSaved = savedResourceRepository.countByUser(user);
         long forumInteractions = forumPostRepository.countByAuthorId(user.getId());
 

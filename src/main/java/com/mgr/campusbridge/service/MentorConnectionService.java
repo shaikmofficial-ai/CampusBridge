@@ -98,10 +98,14 @@ public class MentorConnectionService {
         return MentorConnectionResponse.from(saved);
     }
 
-    public List<MentorConnectionResponse> getConnectedMentors(String studentEmail) {
-        User student = findByEmail(studentEmail);
-        return connectionRepository.findAcceptedConnectionsByStudent(student)
-                .stream()
+    public List<MentorConnectionResponse> getConnectedMentors(String email) {
+        User user = findByEmail(email);
+        // Mentors/alumni see students connected to THEM; students see their mentors.
+        List<MentorConnection> connections =
+                (user.getRole() == User.Role.MENTOR || user.getRole() == User.Role.ALUMNI)
+                        ? connectionRepository.findAcceptedConnectionsByMentor(user)
+                        : connectionRepository.findAcceptedConnectionsByStudent(user);
+        return connections.stream()
                 .map(MentorConnectionResponse::from)
                 .collect(Collectors.toList());
     }

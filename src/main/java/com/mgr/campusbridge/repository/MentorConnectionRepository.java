@@ -16,9 +16,13 @@ public interface MentorConnectionRepository extends JpaRepository<MentorConnecti
     Optional<MentorConnection> findByStudentAndMentor(User student, User mentor);
     boolean existsByStudentAndMentorAndStatus(User student, User mentor, MentorConnection.Status status);
     long countByStudentAndStatus(User student, MentorConnection.Status status);
+    long countByMentorAndStatus(User mentor, MentorConnection.Status status);
 
     @Query("SELECT c FROM MentorConnection c WHERE c.student = :user AND c.status = 'ACCEPTED'")
     List<MentorConnection> findAcceptedConnectionsByStudent(@Param("user") User user);
+
+    @Query("SELECT c FROM MentorConnection c WHERE c.mentor = :user AND c.status = 'ACCEPTED'")
+    List<MentorConnection> findAcceptedConnectionsByMentor(@Param("user") User user);
 
     @Query("SELECT c FROM MentorConnection c WHERE c.mentor = :user AND c.status = 'PENDING'")
     List<MentorConnection> findPendingRequestsForMentor(@Param("user") User user);
