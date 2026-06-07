@@ -7,4 +7,5 @@ import java.util.List;
 public interface ReportRepository extends JpaRepository<Report, Long> {
     List<Report> findByStatusOrderByCreatedAtDesc(Report.ReportStatus status);
     long countByStatus(Report.ReportStatus status);
+    List<Report> findByTargetTypeAndTargetId(Report.TargetType targetType, Long targetId);
 }

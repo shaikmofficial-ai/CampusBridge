@@ -30,6 +30,16 @@ public class Report {
     @Column(columnDefinition = "TEXT")
     private String description;
 
+    /** What kind of thing is being reported. */
+    @Enumerated(EnumType.STRING)
+    private TargetType targetType;
+
+    /** Id of the reported content (forum post / resource), when applicable. */
+    private Long targetId;
+
+    /** Snapshot of the content title for the admin queue (content may be deleted). */
+    private String targetTitle;
+
     @Enumerated(EnumType.STRING)
     private ReportStatus status;
 
@@ -38,10 +48,15 @@ public class Report {
     @PrePersist
     public void onCreate() {
         this.createdAt = LocalDateTime.now();
-        this.status = ReportStatus.OPEN;
+        if (this.status == null) this.status = ReportStatus.OPEN;
+        if (this.targetType == null) this.targetType = TargetType.USER;
     }
 
     public enum ReportStatus {
         OPEN, RESOLVED, DISMISSED
+    }
+
+    public enum TargetType {
+        USER, FORUM_POST, RESOURCE
     }
 }

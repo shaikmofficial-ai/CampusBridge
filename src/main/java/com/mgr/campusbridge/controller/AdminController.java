@@ -44,4 +44,18 @@ public class AdminController {
     public ResponseEntity<?> resolveReport(@PathVariable Long id) {
         return ResponseEntity.ok(adminService.resolveReport(id));
     }
+
+    /** Permanently delete a forum post (moderation). */
+    @DeleteMapping("/forum/posts/{id}")
+    public ResponseEntity<?> deleteForumPost(@PathVariable Long id) {
+        adminService.deleteForumPost(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    /** Permanently delete a resource (moderation). */
+    @DeleteMapping("/resources/{id}")
+    public ResponseEntity<?> deleteResource(@PathVariable Long id) {
+        adminService.deleteResource(id);
+        return ResponseEntity.noContent().build();
+    }
 }

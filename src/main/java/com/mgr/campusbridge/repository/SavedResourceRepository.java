@@ -14,6 +14,7 @@ public interface SavedResourceRepository extends JpaRepository<SavedResource, Lo
     Optional<SavedResource> findByUserAndResource(User user, Resource resource);
     boolean existsByUserAndResource(User user, Resource resource);
     long countByUser(User user);
+    List<SavedResource> findByResource(Resource resource);
 
     @Query("SELECT sr.resource FROM SavedResource sr WHERE sr.user = :user ORDER BY sr.savedAt DESC")
     List<Resource> findSavedResourcesByUser(@Param("user") User user);

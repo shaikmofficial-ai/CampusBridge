@@ -20,7 +20,9 @@ public class AdminService {
 
     private final UserRepository userRepository;
     private final ForumPostRepository forumPostRepository;
+    private final ForumCommentRepository forumCommentRepository;
     private final ResourceRepository resourceRepository;
+    private final SavedResourceRepository savedResourceRepository;
     private final PlacementDriveRepository placementDriveRepository;
     private final ReportRepository reportRepository;
 
@@ -67,6 +69,44 @@ public class AdminService {
                 .orElseThrow(() -> new ResourceNotFoundException("Report not found: " + reportId));
         report.setStatus(Report.ReportStatus.RESOLVED);
         return ReportResponse.from(reportRepository.save(report));
+    }
+
+    /** Permanently delete a reported/inappropriate forum post (admin only). */
+    @Transactional
+    public void deleteForumPost(Long postId) {
+        var post = forumPostRepository.findById(postId)
+                .orElseThrow(() -> new ResourceNotFoundException("Forum post not found: " + postId));
+        // Remove comments first to satisfy FK constraints.
+        forumCommentRepository.deleteAll(forumCommentRepository.findByPostIdOrderByCreatedAtAsc(postId));
+        forumPostRepository.delete(post);
+        autoResolveContentReports(Report.TargetType.FORUM_POST, postId);
+    }
+
+    /** Permanently delete a reported/inappropriate resource (admin only). */
+    @Transactional
+    public void deleteResource(Long resourceId) {
+        var resource = resourceRepository.findById(resourceId)
+                .orElseThrow(() -> new ResourceNotFoundException("Resource not found: " + resourceId));
+        // Remove saved-bookmarks referencing this resource first.
+        savedResourceRepository.deleteAll(savedResourceRepository.findByResource(resource));
+        // Best-effort: delete the stored file.
+        try {
+            if (resource.getFilePath() != null) {
+                java.nio.file.Files.deleteIfExists(java.nio.file.Paths.get(resource.getFilePath()));
+            }
+        } catch (Exception ignored) { /* non-fatal */ }
+        resourceRepository.delete(resource);
+        autoResolveContentReports(Report.TargetType.RESOURCE, resourceId);
+    }
+
+    /** Mark any open reports for a now-deleted item as resolved. */
+    private void autoResolveContentReports(Report.TargetType type, Long targetId) {
+        reportRepository.findByTargetTypeAndTargetId(type, targetId).forEach(r -> {
+            if (r.getStatus() == Report.ReportStatus.OPEN) {
+                r.setStatus(Report.ReportStatus.RESOLVED);
+                reportRepository.save(r);
+            }
+        });
     }
 
     private User findById(Long id) {

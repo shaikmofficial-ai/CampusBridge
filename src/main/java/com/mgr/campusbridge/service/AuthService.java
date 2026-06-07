@@ -31,11 +31,23 @@ public class AuthService {
             throw new RuntimeException("Register number already registered");
         }
 
+        // Security: admins are never created via public registration. They are
+        // inserted directly into the database. Only STUDENT/MENTOR/ALUMNI allowed.
+        User.Role requestedRole;
+        try {
+            requestedRole = User.Role.valueOf(request.getRole().toUpperCase());
+        } catch (IllegalArgumentException | NullPointerException e) {
+            throw new RuntimeException("Invalid role");
+        }
+        if (requestedRole == User.Role.ADMIN) {
+            throw new RuntimeException("Admin accounts cannot be created through registration.");
+        }
+
         User user = User.builder()
                 .name(request.getName())
                 .email(request.getEmail())
                 .password(passwordEncoder.encode(request.getPassword()))
-                .role(User.Role.valueOf(request.getRole().toUpperCase()))
+                .role(requestedRole)
                 .registerNumber(request.getRegisterNumber() != null && !request.getRegisterNumber().isBlank()
                         ? request.getRegisterNumber().trim() : null)
                 .department(request.getDepartment())
