@@ -8,8 +8,11 @@ public class MentorResponse {
     private String name;
     private String designation;
     private String company;
+    private String currentCompany;
+    private String currentRole;
     private double rating;
     private int reviewCount;
+    private int placedCount;
     private List<String> skills;
     private List<String> domains;
     private String profilePicture;

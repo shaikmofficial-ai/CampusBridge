@@ -22,6 +22,11 @@ public class MentorProfile {
 
     private String company;
     private String designation;
+
+    /** Alumni current employment — shown as "currentRole at currentCompany". */
+    private String currentCompany;
+    private String currentRole;
+
     private double rating;
     private int reviewCount;
     private boolean available;

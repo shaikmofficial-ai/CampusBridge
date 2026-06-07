@@ -39,6 +39,7 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/api/auth/register",
                                 "/api/auth/login",
+                                "/uploads/**",
                                 "/ws/**",
                                 "/ws/chat/**"
                         ).permitAll()

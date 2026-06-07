@@ -5,10 +5,12 @@ import com.mgr.campusbridge.dto.response.ProfileResponse;
 import com.mgr.campusbridge.service.ProfileService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/api/profile")
@@ -35,5 +37,14 @@ public class ProfileController {
             @Valid @RequestBody ProfileUpdateRequest request) {
         return ResponseEntity.ok(
                 profileService.updateProfile(userDetails.getUsername(), request));
+    }
+
+    /** Upload a profile picture (validated by Tika + scanned by VirusTotal). */
+    @PostMapping(value = "/picture", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ProfileResponse> uploadProfilePicture(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @RequestParam("file") MultipartFile file) {
+        return ResponseEntity.ok(
+                profileService.uploadProfilePicture(userDetails.getUsername(), file));
     }
 }
