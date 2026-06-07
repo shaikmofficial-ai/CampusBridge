@@ -24,26 +24,48 @@ public class EducationalResourceService {
     private static final Logger log = LoggerFactory.getLogger(EducationalResourceService.class);
     private static final String DEVTO_API = "https://dev.to/api/articles";
 
-    private final RestClient restClient = RestClient.create();
+    // Forem (dev.to) rejects/limits requests without a real User-Agent, often
+    // returning an empty/blocked body. Send proper headers so we get results.
+    private final RestClient restClient = RestClient.builder()
+            .baseUrl(DEVTO_API)
+            .defaultHeader("User-Agent", "CampusBridge/1.0 (+https://mgru.edu.in)")
+            .defaultHeader("Accept", "application/json")
+            .build();
 
-    @SuppressWarnings("unchecked")
     public List<TrendingArticleResponse> getTrending(String tag, int perPage) {
         int size = Math.min(Math.max(perPage, 1), 30);
         String normalizedTag = StringUtils.hasText(tag)
                 ? tag.trim().toLowerCase().replace("#", "").replace(" ", "")
                 : null;
 
+        List<TrendingArticleResponse> results = fetch(normalizedTag, size);
+
+        // Fallback: if a specific tag has no recent articles (or was blocked),
+        // serve the general trending feed so the widget is never empty.
+        if (results.isEmpty() && normalizedTag != null) {
+            log.info("Dev.to returned no articles for tag '{}'; falling back to general feed.", normalizedTag);
+            results = fetch(null, size);
+        }
+        return results;
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<TrendingArticleResponse> fetch(String tag, int size) {
         UriComponentsBuilder builder = UriComponentsBuilder.fromUriString(DEVTO_API)
                 .queryParam("per_page", size);
-        if (normalizedTag != null) builder.queryParam("tag", normalizedTag);
+        if (tag != null) builder.queryParam("tag", tag);
+        String url = builder.build().toUriString();
 
         try {
             List<Map<String, Object>> articles = restClient.get()
-                    .uri(builder.build().toUriString())
+                    .uri(url)
                     .retrieve()
+                    .onStatus(status -> status.isError(), (req, res) -> {
+                        log.warn("Dev.to responded {} for {}", res.getStatusCode(), url);
+                    })
                     .body(List.class);
 
-            if (articles == null) return List.of();
+            if (articles == null || articles.isEmpty()) return List.of();
 
             List<TrendingArticleResponse> out = new ArrayList<>();
             for (Map<String, Object> a : articles) {
@@ -51,7 +73,7 @@ public class EducationalResourceService {
             }
             return out;
         } catch (Exception e) {
-            log.error("Dev.to fetch failed for tag '{}': {}", normalizedTag, e.getMessage());
+            log.error("Dev.to fetch failed for url '{}': {}", url, e.getMessage());
             return List.of();
         }
     }
