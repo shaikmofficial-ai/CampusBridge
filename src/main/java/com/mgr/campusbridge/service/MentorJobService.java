@@ -29,9 +29,10 @@ public class MentorJobService {
         User mentor = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found: " + email));
 
-        // Only mentors (and admins) may post job openings.
-        if (mentor.getRole() != User.Role.MENTOR && mentor.getRole() != User.Role.ADMIN) {
-            throw new UnauthorizedException("Only mentors can post job openings.");
+        // Only mentors/alumni (and admins) may post job openings.
+        if (mentor.getRole() != User.Role.MENTOR && mentor.getRole() != User.Role.ALUMNI
+                && mentor.getRole() != User.Role.ADMIN) {
+            throw new UnauthorizedException("Only mentors and alumni can post job openings.");
         }
         if (mentor.getRole() != User.Role.ADMIN && mentor.getAccountStatus() != User.AccountStatus.APPROVED) {
             throw new UnauthorizedException("Your account is pending admin approval.");

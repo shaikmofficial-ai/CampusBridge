@@ -22,4 +22,8 @@ public interface MentorConnectionRepository extends JpaRepository<MentorConnecti
 
     @Query("SELECT c FROM MentorConnection c WHERE c.mentor = :user AND c.status = 'PENDING'")
     List<MentorConnection> findPendingRequestsForMentor(@Param("user") User user);
+
+    /** Students with an ACCEPTED connection to this mentor. */
+    @Query("SELECT c.student FROM MentorConnection c WHERE c.mentor = :mentor AND c.status = 'ACCEPTED'")
+    List<User> findAcceptedStudentsForMentor(@Param("mentor") User mentor);
 }

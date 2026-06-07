@@ -4,6 +4,7 @@ import com.mgr.campusbridge.dto.request.MentorPlacementRequest;
 import com.mgr.campusbridge.dto.request.MentorProfileRequest;
 import com.mgr.campusbridge.dto.response.MentorPlacementResponse;
 import com.mgr.campusbridge.dto.response.MentorResponse;
+import com.mgr.campusbridge.dto.response.StudentResponse;
 import com.mgr.campusbridge.entity.*;
 import com.mgr.campusbridge.exception.ResourceNotFoundException;
 import com.mgr.campusbridge.exception.UnauthorizedException;
@@ -95,26 +96,52 @@ public class MentorService {
                 && mentor.getRole() != User.Role.ADMIN) {
             throw new UnauthorizedException("Only mentors can add placement records.");
         }
-        if (request.getStudentName() == null || request.getStudentName().isBlank()
-                || request.getCompany() == null || request.getCompany().isBlank()) {
-            throw new UnauthorizedException("Student name and company are required.");
+        if (request.getCompany() == null || request.getCompany().isBlank()) {
+            throw new UnauthorizedException("Company is required.");
         }
+        // A placement must be tied to a student who has an ACCEPTED connection
+        // with this mentor (no more free-typed names).
+        if (request.getStudentId() == null) {
+            throw new UnauthorizedException("Please select a connected student.");
+        }
+        User student = userRepository.findById(request.getStudentId())
+                .orElseThrow(() -> new ResourceNotFoundException("Student not found: " + request.getStudentId()));
 
-        User student = request.getStudentId() != null
-                ? userRepository.findById(request.getStudentId()).orElse(null)
-                : null;
+        boolean connected = mentor.getRole() == User.Role.ADMIN
+                || connectionRepository.existsByStudentAndMentorAndStatus(
+                        student, mentor, MentorConnection.Status.ACCEPTED);
+        if (!connected) {
+            throw new UnauthorizedException(
+                    "You can only record placements for students connected with you.");
+        }
 
         MentorPlacement placement = MentorPlacement.builder()
                 .mentor(mentor)
                 .student(student)
-                .studentName(request.getStudentName().trim())
-                .batch(request.getBatch())
+                .studentName(student.getName())
+                .batch(request.getBatch() != null ? request.getBatch() : student.getBatch())
                 .company(request.getCompany().trim())
                 .role(request.getRole())
                 .packageAmount(request.getPackageAmount())
                 .build();
 
         return MentorPlacementResponse.from(placementRepository.save(placement));
+    }
+
+    /** Students with an ACCEPTED connection to the calling mentor (for the placement selector). */
+    public List<StudentResponse> getMyConnectedStudents(String mentorEmail) {
+        User mentor = userRepository.findByEmail(mentorEmail)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + mentorEmail));
+        return connectionRepository.findAcceptedStudentsForMentor(mentor)
+                .stream().map(StudentResponse::from).collect(Collectors.toList());
+    }
+
+    /** Student discovery for mentors/alumni, optionally filtered by skill/keyword. */
+    public List<StudentResponse> discoverStudents(String skill, String keyword) {
+        String s = (skill != null && !skill.isBlank()) ? skill.trim() : null;
+        String k = (keyword != null && !keyword.isBlank()) ? keyword.trim() : null;
+        return userRepository.searchStudents(s, k)
+                .stream().map(StudentResponse::from).collect(Collectors.toList());
     }
 
     @Transactional

@@ -45,6 +45,12 @@ public class MentorController {
                 userDetails.getUsername(), mentorId));
     }
 
+    /** Students with an ACCEPTED connection to the calling mentor (placement selector). */
+    @GetMapping("/connected-students")
+    public ResponseEntity<?> getConnectedStudents(@AuthenticationPrincipal UserDetails userDetails) {
+        return ResponseEntity.ok(mentorService.getMyConnectedStudents(userDetails.getUsername()));
+    }
+
     // --- Placement tracker ("Students Placed Under Guidance") ---
 
     @GetMapping("/{mentorId}/placements")

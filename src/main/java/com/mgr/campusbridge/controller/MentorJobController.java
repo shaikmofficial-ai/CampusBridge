@@ -23,9 +23,9 @@ public class MentorJobController {
         return ResponseEntity.ok(mentorJobService.getAll());
     }
 
-    /** Only mentors/admins can post. */
+    /** Only mentors/alumni/admins can post. */
     @PostMapping
-    @PreAuthorize("hasAnyRole('MENTOR','ADMIN')")
+    @PreAuthorize("hasAnyRole('MENTOR','ALUMNI','ADMIN')")
     public ResponseEntity<?> create(@AuthenticationPrincipal UserDetails userDetails,
                                     @RequestBody MentorJobRequest request) {
         return ResponseEntity.ok(mentorJobService.create(userDetails.getUsername(), request));
