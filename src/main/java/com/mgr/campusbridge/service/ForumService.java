@@ -19,6 +19,7 @@ public class ForumService {
     private final ForumCommentRepository commentRepository;
     private final ForumGroupRepository groupRepository;
     private final UserRepository userRepository;
+    private final SkillAnalyticsService skillAnalyticsService;
 
     public List<ForumPost> getPublicPosts() {
         return postRepository.findByIsPublicTrueOrderByCreatedAtDesc();
@@ -46,7 +47,10 @@ public class ForumService {
                 .build();
         author.setCommunityPoints(author.getCommunityPoints() + 10);
         userRepository.save(author);
-        return postRepository.save(post);
+        ForumPost saved = postRepository.save(post);
+        // Trigger: new forum post -> record fresh PRI snapshot.
+        skillAnalyticsService.recordSnapshot(author);
+        return saved;
     }
 
     public ForumComment addComment(String email, Long postId, String content) {

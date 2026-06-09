@@ -37,4 +37,17 @@ public interface UserRepository extends JpaRepository<User, Long> {
             ORDER BY u.name ASC
             """)
     List<User> searchStudents(@Param("skill") String skill, @Param("keyword") String keyword);
+
+    /**
+     * Admin directory search: case-insensitive partial match across name,
+     * email and register number.
+     */
+    @Query("""
+            SELECT u FROM User u
+            WHERE LOWER(u.name) LIKE LOWER(CONCAT('%', :q, '%'))
+               OR LOWER(u.email) LIKE LOWER(CONCAT('%', :q, '%'))
+               OR LOWER(COALESCE(u.registerNumber, '')) LIKE LOWER(CONCAT('%', :q, '%'))
+            ORDER BY u.id ASC
+            """)
+    List<User> searchDirectory(@Param("q") String q);
 }

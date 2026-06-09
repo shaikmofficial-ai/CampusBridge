@@ -33,6 +33,7 @@ public class ProfileService {
     private final UserRepository userRepository;
     private final FileValidationService fileValidationService;
     private final VirusScanService virusScanService;
+    private final SkillAnalyticsService skillAnalyticsService;
 
     public ProfileResponse getProfile(String email) {
         User user = findByEmail(email);
@@ -45,6 +46,13 @@ public class ProfileService {
         return ProfileResponse.from(user);
     }
 
+    /** Public portfolio view — hides private/administrative fields. */
+    public com.mgr.campusbridge.dto.response.PublicProfileResponse getPublicProfile(Long id) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + id));
+        return com.mgr.campusbridge.dto.response.PublicProfileResponse.from(user);
+    }
+
     @Transactional
     public ProfileResponse updateProfile(String email, ProfileUpdateRequest request) {
         User user = findByEmail(email);
@@ -54,7 +62,10 @@ public class ProfileService {
         if (request.getPortfolioUrl() != null) user.setPortfolioUrl(request.getPortfolioUrl());
         if (request.getSkills() != null) user.setSkills(request.getSkills());
         if (request.getAchievements() != null) user.setAchievements(request.getAchievements());
-        return ProfileResponse.from(userRepository.save(user));
+        User saved = userRepository.save(user);
+        // Trigger: profile/skill edit -> record fresh PRI snapshot.
+        skillAnalyticsService.recordSnapshot(saved);
+        return ProfileResponse.from(saved);
     }
 
     @Transactional

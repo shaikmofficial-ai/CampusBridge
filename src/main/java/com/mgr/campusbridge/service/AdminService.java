@@ -25,6 +25,7 @@ public class AdminService {
     private final SavedResourceRepository savedResourceRepository;
     private final PlacementDriveRepository placementDriveRepository;
     private final ReportRepository reportRepository;
+    private final SkillAnalyticsService skillAnalyticsService;
 
     public AdminStatsResponse getStats() {
         return AdminStatsResponse.builder()
@@ -44,11 +45,40 @@ public class AdminService {
                 .stream().map(ProfileResponse::from).collect(Collectors.toList());
     }
 
+    /** All registered members for the admin directory data grid. */
+    public List<ProfileResponse> getAllUsers() {
+        return userRepository.findAll(org.springframework.data.domain.Sort.by("id"))
+                .stream().map(ProfileResponse::from).collect(Collectors.toList());
+    }
+
+    /** Case-insensitive partial search across name, email and register number. */
+    public List<ProfileResponse> searchUsers(String query) {
+        if (query == null || query.isBlank()) {
+            return getAllUsers();
+        }
+        return userRepository.searchDirectory(query.trim())
+                .stream().map(ProfileResponse::from).collect(Collectors.toList());
+    }
+
+    /** Toggle a user's access state between ACTIVE and BANNED. */
+    @Transactional
+    public ProfileResponse setBanned(Long userId, boolean banned) {
+        User user = findById(userId);
+        if (user.getRole() == User.Role.ADMIN) {
+            throw new com.mgr.campusbridge.exception.UnauthorizedException("Admin accounts cannot be banned.");
+        }
+        user.setAccountState(banned ? "BANNED" : "ACTIVE");
+        return ProfileResponse.from(userRepository.save(user));
+    }
+
     @Transactional
     public ProfileResponse approveUser(Long userId) {
         User user = findById(userId);
         user.setAccountStatus(User.AccountStatus.APPROVED);
-        return ProfileResponse.from(userRepository.save(user));
+        User saved = userRepository.save(user);
+        // Trigger: admin verified the account/certificates -> fresh PRI snapshot.
+        skillAnalyticsService.recordSnapshot(saved);
+        return ProfileResponse.from(saved);
     }
 
     @Transactional

@@ -65,6 +65,11 @@ public class User {
     @Enumerated(EnumType.STRING)
     private AccountStatus accountStatus = AccountStatus.PENDING;
 
+    /** Access state for the ban system. Defaults to ACTIVE. */
+    @Column(name = "account_state", length = 16, nullable = false)
+    @Builder.Default
+    private String accountState = "ACTIVE";
+
     private LocalDateTime createdAt;
 
     @ElementCollection(fetch = FetchType.EAGER)

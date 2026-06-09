@@ -31,6 +31,12 @@ public class ProfileController {
         return ResponseEntity.ok(profileService.getProfileById(id));
     }
 
+    /** Public portfolio view (read-only, hides private/admin fields). */
+    @GetMapping("/{id}/public")
+    public ResponseEntity<?> getPublicProfile(@PathVariable Long id) {
+        return ResponseEntity.ok(profileService.getPublicProfile(id));
+    }
+
     @PutMapping
     public ResponseEntity<ProfileResponse> updateProfile(
             @AuthenticationPrincipal UserDetails userDetails,

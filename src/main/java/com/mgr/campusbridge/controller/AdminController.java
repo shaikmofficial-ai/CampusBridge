@@ -25,6 +25,33 @@ public class AdminController {
         return ResponseEntity.ok(adminService.getPendingUsers());
     }
 
+    /** Full member directory for the admin data grid. */
+    @GetMapping("/users")
+    public ResponseEntity<?> getAllUsers() {
+        return ResponseEntity.ok(adminService.getAllUsers());
+    }
+
+    /**
+     * Search members by name, email, or register number (case-insensitive,
+     * partial match). Frontend sends ?query=...
+     */
+    @GetMapping("/users/search")
+    public ResponseEntity<?> searchUsers(@RequestParam(value = "query", required = false) String query) {
+        return ResponseEntity.ok(adminService.searchUsers(query));
+    }
+
+    /** Ban a user (account_state -> BANNED). */
+    @PostMapping("/users/{id}/ban")
+    public ResponseEntity<?> banUser(@PathVariable Long id) {
+        return ResponseEntity.ok(adminService.setBanned(id, true));
+    }
+
+    /** Lift a ban (account_state -> ACTIVE). */
+    @PostMapping("/users/{id}/unban")
+    public ResponseEntity<?> unbanUser(@PathVariable Long id) {
+        return ResponseEntity.ok(adminService.setBanned(id, false));
+    }
+
     @PostMapping("/approve/{id}")
     public ResponseEntity<?> approve(@PathVariable Long id) {
         return ResponseEntity.ok(adminService.approveUser(id));

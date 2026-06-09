@@ -1,5 +1,7 @@
 package com.mgr.campusbridge.security;
 
+import com.mgr.campusbridge.entity.User;
+import com.mgr.campusbridge.repository.UserRepository;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -13,6 +15,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.Optional;
 
 @Component
 @RequiredArgsConstructor
@@ -20,6 +23,7 @@ public class JwtFilter extends OncePerRequestFilter {
 
     private final JwtUtil jwtUtil;
     private final UserDetailsServiceImpl userDetailsService;
+    private final UserRepository userRepository;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
@@ -40,6 +44,18 @@ public class JwtFilter extends OncePerRequestFilter {
         try {
             if (jwtUtil.validateToken(token)) {
                 String email = jwtUtil.extractEmail(token);
+
+                // Airtight ban check: if the account is BANNED, terminate the
+                // request immediately with 403 and clear any auth context.
+                Optional<User> account = userRepository.findByEmail(email);
+                if (account.isPresent() && "BANNED".equalsIgnoreCase(account.get().getAccountState())) {
+                    SecurityContextHolder.clearContext();
+                    response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                    response.setContentType("application/json");
+                    response.getWriter().write(
+                            "{\"error\":\"Your account has been banned. Contact the administrator.\"}");
+                    return; // do NOT continue the filter chain
+                }
 
                 // Only set auth if not already set
                 if (email != null &&
