@@ -32,6 +32,7 @@ public class Report {
 
     /** What kind of thing is being reported. */
     @Enumerated(EnumType.STRING)
+    @Column(name = "target_type", length = 32)
     private TargetType targetType;
 
     /** Id of the reported content (forum post / resource), when applicable. */
@@ -41,6 +42,7 @@ public class Report {
     private String targetTitle;
 
     @Enumerated(EnumType.STRING)
+    @Column(name = "status", length = 32)
     private ReportStatus status;
 
     private LocalDateTime createdAt;
