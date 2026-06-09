@@ -6,6 +6,7 @@ import com.mgr.campusbridge.entity.User;
 import com.mgr.campusbridge.exception.ResourceNotFoundException;
 import com.mgr.campusbridge.repository.ForumPostRepository;
 import com.mgr.campusbridge.repository.ProfileSnapshotRepository;
+import com.mgr.campusbridge.repository.UserLearningProgressRepository;
 import com.mgr.campusbridge.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -30,9 +31,16 @@ public class SkillAnalyticsService {
 
     private final ProfileSnapshotRepository snapshotRepository;
     private final ForumPostRepository forumPostRepository;
+    private final UserLearningProgressRepository learningProgressRepository;
     private final UserRepository userRepository;
 
-    /** Weighted PRI formula. */
+    /**
+     * Weighted PRI formula:
+     *   (skill tags * 5) + (verified certs * 25) + (forum posts * 2)
+     *   + (lessons solved * 25)
+     * Lessons solved are included so clearing a coding challenge curves the
+     * timeline graph upward immediately.
+     */
     public int computePri(User user) {
         int skillTags = user.getSkills() != null ? user.getSkills().size() : 0;
         // Verified certificates are tracked via the user's achievements list once
@@ -40,8 +48,10 @@ public class SkillAnalyticsService {
         int verifiedCertificates = (user.getAccountStatus() == User.AccountStatus.APPROVED
                 && user.getAchievements() != null) ? user.getAchievements().size() : 0;
         long forumPosts = forumPostRepository.countByAuthorId(user.getId());
+        long lessonsSolved = learningProgressRepository.countByUserId(user.getId());
 
-        return (skillTags * 5) + (verifiedCertificates * 25) + (int) (forumPosts * 2);
+        return (skillTags * 5) + (verifiedCertificates * 25)
+                + (int) (forumPosts * 2) + (int) (lessonsSolved * 25);
     }
 
     /**
