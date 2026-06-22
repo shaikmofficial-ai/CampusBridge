@@ -61,11 +61,34 @@ public class GeminiApiService {
                     .contentType(MediaType.APPLICATION_JSON)
                     .body(body)
                     .retrieve()
+                    // Surface Google's actual error body (invalid key, model not
+                    // found, quota, safety block...) so it shows in our console
+                    // instead of being hidden behind a generic fallback.
+                    .onStatus(status -> status.isError(), (request, response) -> {
+                        String errorBody = new String(response.getBody().readAllBytes());
+                        log.error("Gemini HTTP {} error. Response body: {}",
+                                response.getStatusCode(), errorBody);
+                    })
                     .body(Map.class);
 
-            return extractText(res);
+            if (res == null) {
+                log.error("Gemini returned an empty response body.");
+                return null;
+            }
+
+            // Log a possible safety/promptFeedback block (no candidates returned).
+            if (res.get("candidates") == null && res.get("promptFeedback") != null) {
+                log.error("Gemini returned no candidates. promptFeedback={}", res.get("promptFeedback"));
+            }
+
+            String text = extractText(res);
+            if (text == null) {
+                log.error("Gemini parsing yielded no text. Raw response: {}", res);
+            }
+            return text;
         } catch (Exception e) {
-            log.error("Gemini call failed: {}", e.getMessage());
+            // Full stack trace so the real cause flows to the console window.
+            log.error("Gemini call failed with an exception", e);
             return null;
         }
     }
@@ -84,7 +107,8 @@ public class GeminiApiService {
             Object text = parts.get(0).get("text");
             return text != null ? text.toString() : null;
         } catch (Exception e) {
-            log.error("Failed to parse Gemini response: {}", e.getMessage());
+            // Log the full structure + stack so parsing issues are debuggable.
+            log.error("Failed to parse Gemini response. Raw: {}", res, e);
             return null;
         }
     }
