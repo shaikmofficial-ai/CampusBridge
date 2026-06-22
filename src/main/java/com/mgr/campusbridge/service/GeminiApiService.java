@@ -38,6 +38,11 @@ public class GeminiApiService {
         return StringUtils.hasText(apiKey);
     }
 
+    /** The configured model endpoint (for diagnostics; no key exposed). */
+    public String getBaseUrl() {
+        return baseUrl;
+    }
+
     /**
      * Send a prompt to Gemini and return the extracted text, or null on
      * failure / when unconfigured (so the caller can fall back gracefully).
